@@ -1,0 +1,135 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import plotly.express as px
+import pprint
+from sklearn.linear_model import LinearRegression
+import seaborn as sns
+
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+from google.colab import auth
+from oauth2client.client import GoogleCredentials
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+# **Data Cleaning**
+
+Reading the csv data into pandas dataframe 'data'
+
+data=pd.read_csv("/content/drive/MyDrive/4th Sem Project/Data/GlobalLandTemperaturesByCountry.csv",parse_dates=['dt'])
+data.head(10)
+
+'''data=pd.read_csv("/content/drive/MyDrive/Datasets/Climate Change/Dataset 1/GlobalLandTemperaturesByCountry.csv",parse_dates=['dt'])
+data.head(10)'''
+
+temp=data
+
+temp.isna().sum()
+
+data.nunique()
+
+#Adding another column Year in the data frame for future reference
+
+data['Year']=pd.DatetimeIndex(data['dt']).year
+
+data.head(5)
+
+#Changing the data type of Country column from object to category using lambda function
+
+data.loc[:,'Country']=data.select_dtypes(['object']).apply(lambda x: x.astype('category'))
+
+data.info()
+
+#Checking if there are any missing values
+
+data.isnull().sum()
+
+#Dropping the missing values
+
+data=data.dropna(axis=0,how='any')
+
+data.shape
+
+data.nunique()
+
+#Creating an list of the countries and the years in the dataframe for future reference
+
+countries=np.unique(data['Country'])
+
+years=list(range(np.unique(data['Year']).min(),np.unique(data['Year']).max()+1))
+
+#As per countries there are more than 2000 values we are taking the yearly median per country
+
+summary_df_avgtmp=data.groupby(['Country','Year']).agg({'AverageTemperature':'median'}).reset_index()
+summary_df_avgtmp.head()
+
+temp_summary_df=summary_df_avgtmp
+
+#Again checking for missing values
+
+summary_df_avgtmp.isna().sum()
+
+summary_df_avgtmp.shape
+
+#Creating dataframe of the years per country for which the yearly median is missing
+
+yearwise_na=summary_df_avgtmp[['Country','Year']][summary_df_avgtmp.AverageTemperature.isna()]
+
+yearwise_na.head()
+
+#Creating another datafrome to see how many data are missing per country in the summary_df_avgtmp pandas dataframe
+
+countrywisena=summary_df_avgtmp.loc[:,['AverageTemperature']].isnull().groupby(summary_df_avgtmp.Country).sum().reset_index()
+countrywisena.head()
+'''
+As per country there are many missing values, but there are many countries for which between some years the data is missing. So we are trying to get the first year from which the data is started for each country, and we will drop the years before that particular.
+
+exporting the above dataframes as csv
+'''
+
+# **Data Manipulation**
+
+##**Continentwise**
+
+
+As in the previous section we have seen that there are 242 countries in the data but in reality there are only 194 countries. So I have downloaded a dataset of the actual countries with their population and world share and land area. And then I checked which countries from our working dataset are not in the actualcountries dataset.
+
+count_real=pd.read_excel('/content/drive/MyDrive/4th Sem Project/Some_necessary_files/ActualCountriesNames.xlsx')
+count_real.head()
+
+continentwcountry=pd.read_excel('/content/drive/MyDrive/4th Sem Project/Some_necessary_files/Continentwisecountry.xlsx')
+continentwcountry.head()
+
+extra_count1=[]
+for country in countries:
+  if country not in list(continentwcountry['Country']):
+    extra_count1.append(country)
+
+pprint.pprint(extra_count1)
+
+extra_count=[]
+for country in continentwcountry['Country']:
+  if country not in countries:
+    extra_count.append(country)
+pprint.pprint(extra_count)
+
+contcountry={}
+for continent in list(np.unique(continentwcountry['Continent'])):
+  temp_list=[]
+  for country in countries:
+    if country in list(continentwcountry['Country'][continentwcountry['Continent']==continent]):
+      temp_list.append(country)
+  print(continent+':'+str(len(temp_list)))
+  contcountry[continent]=temp_list
+
+continentwisedata={}
+for continent in contcountry.keys():
+  continentwisedata[continent]={}
+  print(continent,end='\n\n')
+  for country in contcountry[continent]:
+    continentwisedata[continent][country]=temp[temp.Country==country]
+    print(country,str(continentwisedata[continent][country].shape),sep=':')
+  print('\n')
+
